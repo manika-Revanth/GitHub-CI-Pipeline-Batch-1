@@ -69,18 +69,18 @@ pipeline {
             }
         }
         stage('Docker Build') {
-    steps {
-        script {
+         steps {
+           script {
             env.IMAGE_TAG = "batch1-calculator:${env.BUILD_NUMBER}"
-        }
+          }
 
         sh '''
             echo "Building Docker image..."
             docker build -t "$IMAGE_TAG" .
             echo "Docker image build completed."
         '''
-    }
-}
+          }
+        }
 
 stage('Docker Image Validation') {
     steps {
