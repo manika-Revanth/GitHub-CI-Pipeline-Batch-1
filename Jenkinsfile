@@ -1,12 +1,12 @@
 pipeline {
     agent any
-    parameters {
-    choice(
+     parameters {
+     choice(
         name: 'TARGET_ENV',
         choices: ['dev', 'test'],
         description: 'Select the target environment for this CI run'
       )
-   }
+    }
 
     options {
         timestamps()
@@ -36,17 +36,17 @@ pipeline {
             }
         }
         stage('Run Configuration') {
-            steps {
-                    echo "Selected environment: ${params.TARGET_ENV}"
-                    echo "Application: ${env.APP_NAME}"
+          steps {
+            echo "Selected environment: ${params.TARGET_ENV}"
+            echo "Application: ${env.APP_NAME}"
             }
         }
         stage('Credential Handling Demo') {
-            steps {
-                   withCredentials([
-                  string(
-                   credentialsId: 'training-demo-token',
-                   variable: 'DEMO_TOKEN'
+    steps {
+        withCredentials([
+            string(
+                credentialsId: 'training-demo-token',
+                variable: 'DEMO_TOKEN'
             )
         ]) {
             sh '''
@@ -60,6 +60,7 @@ pipeline {
         }
     }
 }
+
         stage('Unit Tests') {
             steps {
                 sh '''
@@ -68,19 +69,19 @@ pipeline {
                 '''
             }
         }
-        stage('Docker Build') {
-         steps {
-           script {
+stage('Docker Build') {
+    steps {
+        script {
             env.IMAGE_TAG = "batch1-calculator:${env.BUILD_NUMBER}"
-          }
+        }
 
         sh '''
             echo "Building Docker image..."
             docker build -t "$IMAGE_TAG" .
             echo "Docker image build completed."
         '''
-          }
-        }
+    }
+}
 
 stage('Docker Image Validation') {
     steps {
@@ -107,7 +108,7 @@ stage('Docker Image Validation') {
         '''
     }
 }
-    stage('Push Docker Image to AWS ECR') {
+      stage('Push Docker Image to AWS ECR') {
             steps {
                 sh '''
                     set -eu
@@ -164,4 +165,66 @@ stage('Docker Image Validation') {
                 '''
             }
         }
+        stage('Compile Check') {
+            steps {
+                sh '''
+                    echo "Checking Python source syntax..."
+                    python3 -m compileall -q app tests
+                    echo "Compile check passed."
+                '''
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh '''
+                    mkdir -p dist
+
+                    python3 - <<'PY'
+import zipfile
+
+files = [
+    "app/calculator.py",
+    "tests/test_calculator.py"
+]
+
+with zipfile.ZipFile(
+    "dist/calculator-package.zip",
+    "w",
+    zipfile.ZIP_DEFLATED
+) as package:
+    for file in files:
+        package.write(file)
+
+print("Application package created.")
+PY
+
+                    ls -lh dist/
+                '''
+            }
+        }
+
+        stage('Archive') {
+            steps {
+                archiveArtifacts(
+                    artifacts: 'dist/calculator-package.zip',
+                    fingerprint: true
+                )
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Application CI pipeline completed successfully.'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check the failed stage and console output.'
+        }
+
+        always {
+            echo 'Pipeline execution finished.'
+        }
+    }
 }
